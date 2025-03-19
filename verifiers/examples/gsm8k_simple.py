@@ -12,7 +12,7 @@ training_args = vf.get_default_grpo_config(run_name=run_name, num_gpus=8)
 trainer = vf.GRPOEnvTrainer(
     model=model,
     processing_class=tokenizer,
-    reward_funcs=rubric, 
+    reward_funcs=rubric,
     env=vf_env,
     args=training_args,
     train_dataset=dataset,

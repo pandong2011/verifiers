@@ -3,14 +3,14 @@ import verifiers as vf
 
 if os.getenv("BRAVE_API_KEY"):
     print("Using Brave as a search engine. BRAVE_API_KEY must be set. See https://brave.com/search/api/")
-    from verifiers.tools import search_brave as search 
+    from verifiers.tools import search_brave as search
 else:
     print(
         "WARNING: Using DuckDuckGo as a search engine. \
         This may be rate limited (which can cause training to fail). \
         Consider setting a paid BRAVE_API_KEY (https://brave.com/search/api/) to use Brave instead."
     )
-    from verifiers.tools import search_ddg as search 
+    from verifiers.tools import search_ddg as search
 
 from verifiers.prompts import SEARCH_FEW_SHOT
 
@@ -30,7 +30,7 @@ rubric = vf_env.get_rubric()
 run_name = "obqa-search_" + model_name.split("/")[-1].lower()
 training_args = vf.get_default_grpo_config(
     run_name=run_name,
-    num_gpus=8 # 7 train + 1 inference
+    num_gpus=8  # 7 train + 1 inference
 )
 training_args.learning_rate = 1e-6
 
@@ -52,5 +52,4 @@ trainer = vf.GRPOEnvTrainer(
     args=training_args,
     train_dataset=train_dataset
 )
-trainer.train() 
-
+trainer.train()

@@ -13,7 +13,7 @@ rubric = vf_env.get_rubric()
 run_name = "gsm8k-code_" + model_name.split("/")[-1].lower()
 training_args = vf.get_default_grpo_config(
     run_name=run_name,
-    num_gpus=8 # 7 train + 1 inference
+    num_gpus=8  # 7 train + 1 inference
 )
 # rollouts per prompt
 training_args.num_generations = 7
@@ -33,7 +33,7 @@ training_args.eval_accumulation_steps = 8
 trainer = vf.GRPOEnvTrainer(
     model=model,
     processing_class=tokenizer,
-    reward_funcs=rubric, 
+    reward_funcs=rubric,
     env=vf_env,
     args=training_args,
     train_dataset=dataset,

@@ -10,16 +10,17 @@ from verifiers.prompts import CODE_FEW_SHOT, CODE_PROMPT
 from verifiers.rubrics import CodeRubric
 from verifiers.utils import preprocess_dataset
 
+
 class CodeEnv(MultiStepEnv):
     def __init__(self,
-                 dataset: str = "gsm8k",        
+                 dataset: str = "gsm8k",
                  system_prompt: str = CODE_PROMPT,
                  few_shot: List[Dict[str, str]] = CODE_FEW_SHOT[0],
                  sampling_args: Dict[str, Any] = {
                      "stop": ["</code>", "</answer>"],
                      "include_stop_str_in_output": True
                  },
-                 mask_env_response: bool = True, 
+                 mask_env_response: bool = True,
                  max_steps: int = 5, **kwargs):
         super().__init__(
             system_prompt=system_prompt,
@@ -43,7 +44,7 @@ class CodeEnv(MultiStepEnv):
 
     def get_dataset(self, **kwargs: Any) -> Dataset:
         return self.dataset
-    
+
     def get_eval_dataset(self, **kwargs: Any) -> Dataset:
         if self.eval_dataset is None:
             self.eval_dataset = preprocess_dataset(
@@ -53,10 +54,10 @@ class CodeEnv(MultiStepEnv):
                 few_shot=self.few_shot
             )
         return self.eval_dataset
-    
+
     def get_rubric(self, **kwargs: Any) -> List[RewardFunc]:
         return self.rubric.get_reward_funcs()
-    
+
     def is_completed(self, messages: List[Dict[str, str]], **kwargs: Any) -> bool:
         try:
             parsed = self.llm_parser.parse(messages[-1]["content"])
@@ -93,4 +94,5 @@ class CodeEnv(MultiStepEnv):
                     return {"role": "user", "content": "Error: Code execution returned empty output."}
         except Exception:
             pass
-        return {"role": "user", "content": "Error: Code not found or invalid XML format. Please ensure correct formatting."}
+        return {"role": "user",
+                "content": "Error: Code not found or invalid XML format. Please ensure correct formatting."}

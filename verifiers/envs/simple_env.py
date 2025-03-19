@@ -1,12 +1,10 @@
-from abc import abstractmethod
-import json
 import random
-from typing import List, Dict, Sequence, Any, Union
+from typing import List, Dict, Sequence, Any
 
 from datasets import Dataset
 
-from ..imports import LLM, SamplingParams  # type: ignore
 from verifiers.envs.environment import Environment
+from ..imports import LLM, SamplingParams  # type: ignore
 
 
 class SimpleEnv(Environment):
@@ -44,8 +42,8 @@ class SimpleEnv(Environment):
                  llm: LLM,
                  sampling_params: SamplingParams,
                  **kwargs: Any) -> Dict[str, List[Sequence[int]] | List[str] | List[List[Dict[str, Any]]]]:
-        
-        custom_sp = sampling_params.clone() 
+
+        custom_sp = sampling_params.clone()
         for k, v in self.sampling_args.items():
             setattr(custom_sp, k, v)
         states = [{
@@ -56,10 +54,10 @@ class SimpleEnv(Environment):
         } for m in prompts]
 
         # get completions
-        completions = llm.chat(prompts, sampling_params=custom_sp, use_tqdm=False) # type: ignore
+        completions = llm.chat(prompts, sampling_params=custom_sp, use_tqdm=False)  # type: ignore
         for i, completion in enumerate(completions):
             states[i]["messages"].append({"role": "assistant", "content": completion.outputs[0].text})
-            states[i]["prompt_ids"] = list(completion.prompt_token_ids) # type: ignore
+            states[i]["prompt_ids"] = list(completion.prompt_token_ids)  # type: ignore
             states[i]["completion_ids"] = list(completion.outputs[0].token_ids)
             states[i]["completion_mask"] = [1] * len(states[i]["completion_ids"])
 

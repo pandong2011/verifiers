@@ -1,0 +1,22 @@
+torch
+setuptools
+wheel
+deepspeed==0.16.3
+accelerate
+peft
+wandb
+rich
+duckduckgo-search
+# 需要梯子
+trl @ git+https://github.com/huggingface/trl.git
+# 优化对齐训练
+# liger-kernel==0.5.2
+# 优化推理部署
+# vllm==0.7.3
+brave-search==0.1.8
+openai
+transformers
+datasets
+# flash_attn 通常依赖于 CUDA 进行加速
+# 确保torch 和 flash_attn兼容
+# flash-attn

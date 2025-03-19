@@ -3,6 +3,7 @@ from typing import List, Dict
 from verifiers.parsers import XMLParser
 from verifiers.rubrics import Rubric
 
+
 class CodeRubric(Rubric):
     def __init__(self,
                  parser: XMLParser = XMLParser(fields=["reasoning", ("code", "answer")]),
@@ -21,10 +22,11 @@ class CodeRubric(Rubric):
                                    completions: List[List[Dict[str, str]]],
                                    **kwargs) -> List[float]:
         """Reward function that checks code execution success at each step."""
+
         def check_execution(trajectory: List[Dict[str, str]]) -> float:
             total_code_steps = 0
             successful_executions = 0
-            
+
             for i, msg in enumerate(trajectory):
                 if msg['role'] == 'assistant':
                     parsed = self.parser.parse(msg['content'])
@@ -38,12 +40,10 @@ class CodeRubric(Rubric):
                                 output = parsed_response.output
                                 if len(output) > 0 and not output.startswith('Error:'):
                                     successful_executions += 1
-            
+
             # Return proportional reward based on successful executions
             if total_code_steps == 0:
                 return 0.0
             return 0.3 * (successful_executions / total_code_steps) + 0.05 * (successful_executions)
-        
-        return [check_execution(c) for c in completions]
-    
 
+        return [check_execution(c) for c in completions]

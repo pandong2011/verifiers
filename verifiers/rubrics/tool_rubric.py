@@ -3,6 +3,7 @@ from typing import List, Dict
 from verifiers.parsers import XMLParser
 from verifiers.rubrics import Rubric
 
+
 class ToolRubric(Rubric):
     def __init__(self,
                  parser: XMLParser = XMLParser(fields=["reasoning", ("tool", "answer")]),
@@ -22,10 +23,11 @@ class ToolRubric(Rubric):
 
         Uses XMLParser to identify proper tool calls.
         """
+
         def check_execution(trajectory):
             tool_attempts = 0
             successful_executions = 0
-            
+
             # Find assistant messages with tools and their responses
             for i, msg in enumerate(trajectory):
                 if msg['role'] == 'assistant':
@@ -37,12 +39,14 @@ class ToolRubric(Rubric):
                             tool_attempts += 1
                             # Check response with env_parser
                             parsed_response = self.env_parser.parse(trajectory[i + 1]['content'])
-                            if hasattr(parsed_response, 'result') and parsed_response.result is not None and not parsed_response.result.startswith("Error:"):
+                            if hasattr(parsed_response,
+                                       'result') and parsed_response.result is not None and not parsed_response.result.startswith(
+                                    "Error:"):
                                 successful_executions += 1
-            
+
             # Calculate reward
             if tool_attempts == 0:
                 return 0.0
             return 0.2 * (successful_executions / tool_attempts)
-        
+
         return [check_execution(c) for c in completions]

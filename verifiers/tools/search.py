@@ -27,8 +27,9 @@ def search_ddg(query: str, num_results: int = 5) -> str:
 
             return "\n\n".join(summaries)
     except Exception as e:
-        return f"Error: {str(e)}" 
-    
+        return f"Error: {str(e)}"
+
+
 def search_brave(query: str, num_results: int = 5) -> str:
     """Searches Brave and returns concise summaries of top results.
     
@@ -47,9 +48,9 @@ def search_brave(query: str, num_results: int = 5) -> str:
 
     try:
         brave = Brave()
-        results = brave.search(q=query, count=min(num_results, 10)) # type: ignore
-        results: List[Dict[str, Any]] = results.web_results # type: ignore
-        
+        results = brave.search(q=query, count=min(num_results, 10))  # type: ignore
+        results: List[Dict[str, Any]] = results.web_results  # type: ignore
+
         if not results:
             return "No results found"
 
@@ -57,7 +58,7 @@ def search_brave(query: str, num_results: int = 5) -> str:
         for r in results:
             header = f"{r['profile']['name']} ({r['profile']['long_name']})"
             title = r['title']
-            snippet = r['description'] #[:200].rsplit('.', 1)[0] + '.'
+            snippet = r['description']  # [:200].rsplit('.', 1)[0] + '.'
             summaries.append(f"•  {header}\n   {title}\n   {snippet}")
 
         return "\n\n".join(summaries)

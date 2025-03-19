@@ -10,4 +10,4 @@ if IS_MACOS:
 else:
     from vllm import LLM, SamplingParams  # type: ignore
 
-__all__ = ['LLM', 'SamplingParams', 'IS_MACOS'] 
+__all__ = ['LLM', 'SamplingParams', 'IS_MACOS']

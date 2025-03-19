@@ -1,9 +1,8 @@
-from typing import Callable, Optional, Union, Any, List
+from typing import Callable, Optional, Union, Any
 
+import torch
 from accelerate.utils import broadcast_object_list, gather, gather_object
 from datasets import Dataset, IterableDataset
-import torch
-from torch import nn
 from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
@@ -13,7 +12,7 @@ from transformers import (
 )
 from transformers.utils import is_peft_available
 from trl import GRPOTrainer, GRPOConfig
-from trl.data_utils import apply_chat_template, maybe_apply_chat_template
+from trl.data_utils import maybe_apply_chat_template
 from trl.import_utils import is_rich_available
 from trl.trainer.utils import pad
 

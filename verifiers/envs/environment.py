@@ -6,6 +6,7 @@ from datasets import Dataset
 from trl.trainer.grpo_trainer import RewardFunc
 from ..imports import LLM, SamplingParams  # type: ignore
 
+
 class Environment(ABC):
 
     def __init__(self, **kwargs: Any):
@@ -27,7 +28,7 @@ class Environment(ABC):
     @abstractmethod
     def get_rubric(self, **kwargs: Any) -> List[RewardFunc]:
         pass
-    
+
     @abstractmethod
     def generate(self,
                  prompts: List[List[Dict[str, Any]]],

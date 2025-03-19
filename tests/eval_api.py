@@ -3,6 +3,7 @@ from verifiers.prompts import CODE_PROMPT, CODE_FEW_SHOT
 
 import os
 from openai import OpenAI
+
 model_name = "Qwen/Qwen2.5-Coder-32B-Instruct"
 api_key = os.getenv("DEEPINFRA_API_KEY")
 base_url = "https://api.deepinfra.com/v1/openai"

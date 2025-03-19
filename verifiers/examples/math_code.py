@@ -1,7 +1,7 @@
 import verifiers as vf
 from verifiers.prompts import CODE_PROMPT, CODE_FEW_SHOT
 
-#model_name = "Qwen/Qwen2.5-7B-Instruct"
+# model_name = "Qwen/Qwen2.5-7B-Instruct"
 model_name = "meta-llama/Llama-3.1-8B-Instruct"
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 tokenizer.pad_token = tokenizer.eos_token
@@ -46,7 +46,7 @@ training_args.beta = 0.02
 trainer = vf.GRPOEnvTrainer(
     model=model,
     processing_class=tokenizer,
-    reward_funcs=rubric, 
+    reward_funcs=rubric,
     env=vf_env,
     args=training_args,
     train_dataset=dataset

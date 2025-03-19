@@ -34,6 +34,7 @@ class MultiStepEnv(Environment):
         self.max_workers = max_workers
         self.sleep_time = sleep_time
         self.max_steps = max_steps
+
     def get_dataset(self, **kwargs: Any) -> Dataset | None:
         pass
 
@@ -56,12 +57,12 @@ class MultiStepEnv(Environment):
              states: List[Dict[str, Any]],
              llm: LLM,
              sampling_params: SamplingParams) -> List[Dict[str, Any]]:
-        
+
         live_indices = [i for i, s in enumerate(states) if not s["completed"]]
         messages_to_step = [states[i]["messages"] for i in live_indices]
-        llm_responses = llm.chat(messages_to_step, sampling_params=sampling_params, use_tqdm=False) # type: ignore
+        llm_responses = llm.chat(messages_to_step, sampling_params=sampling_params, use_tqdm=False)  # type: ignore
 
-        #for i, j in enumerate(live_indices):
+        # for i, j in enumerate(live_indices):
         def update_state(j, llm_response):
             # sleep for 0-1 seconds to avoid rate limiting
             time.sleep(self.sleep_time * random.random())
@@ -70,10 +71,10 @@ class MultiStepEnv(Environment):
             if len(state["prompt_ids"]) == 0:
                 state["prompt_ids"] = llm_response.prompt_token_ids
             state["messages"].append({"role": "assistant", "content": llm_response.outputs[0].text})
-        
+
             # get token lengths of env response and new completion
             total_prev_len = len(state["prompt_ids"]) + len(state["completion_ids"])
-            env_response_len  = len(list(llm_response.prompt_token_ids)) - total_prev_len # type: ignore
+            env_response_len = len(list(llm_response.prompt_token_ids)) - total_prev_len  # type: ignore
             new_completion_len = len(llm_response.outputs[0].token_ids)
 
             # update completion masks
@@ -81,11 +82,12 @@ class MultiStepEnv(Environment):
             state["completion_mask"].extend([1] * new_completion_len)
 
             # update completion ids
-            state["completion_ids"] = list(llm_response.prompt_token_ids) # type: ignore
+            state["completion_ids"] = list(llm_response.prompt_token_ids)  # type: ignore
             state["completion_ids"].extend(list(llm_response.outputs[0].token_ids))
             state["completion_ids"] = state["completion_ids"][len(state["prompt_ids"]):]
 
-            if self.is_completed(state["messages"]) or len(state["completion_ids"]) > sampling_params.max_tokens: # type: ignore
+            if self.is_completed(state["messages"]) or len(
+                    state["completion_ids"]) > sampling_params.max_tokens:  # type: ignore
                 state["completed"] = True
                 state["completion_ids"] = state["completion_ids"][:sampling_params.max_tokens]
                 state["completion_mask"] = state["completion_mask"][:len(state["completion_ids"])]
@@ -114,7 +116,7 @@ class MultiStepEnv(Environment):
     def generate(self, prompts: List[List[Dict[str, Any]]],
                  llm: LLM,
                  sampling_params: SamplingParams,
-                 **kwargs: Any) -> Dict[str, List[Sequence[int]] | List[str] |  List[List[Dict[str, Any]]]]:
+                 **kwargs: Any) -> Dict[str, List[Sequence[int]] | List[str] | List[List[Dict[str, Any]]]]:
         custom_sp = sampling_params.clone()
         for k, v in self.sampling_args.items():
             setattr(custom_sp, k, v)
@@ -145,11 +147,11 @@ class MultiStepEnv(Environment):
         }
         return output
 
-    def step_api(self, 
-             client: Any,
-             model: str,
-             messages: List[Dict[str, str]],
-             **kwargs: Any) -> Tuple[List[Dict[str, str]], bool]:
+    def step_api(self,
+                 client: Any,
+                 model: str,
+                 messages: List[Dict[str, str]],
+                 **kwargs: Any) -> Tuple[List[Dict[str, str]], bool]:
         """
         Execute a single step using OpenAI API, including environment response if needed.
         
@@ -163,21 +165,21 @@ class MultiStepEnv(Environment):
             Updated messages list with assistant response and possibly environment response
         """
         messages_copy = messages.copy()
-        
-        try:            
+
+        try:
             # Get assistant response
             response = client.chat.completions.create(
                 model=model,
                 messages=messages_copy,
             )
-            
+
             # Add assistant response to messages
             assistant_msg = {
-                "role": "assistant", 
+                "role": "assistant",
                 "content": response.choices[0].message.content
             }
             messages_copy.append(assistant_msg)
-            
+
             # Check if we're done
             if self.is_completed(messages_copy):
                 rollout_is_completed = True
@@ -186,22 +188,22 @@ class MultiStepEnv(Environment):
                 # If not done, get and add environment response
                 env_msg = self.env_response(messages_copy)
                 messages_copy.append(env_msg)
-            
+
             return messages_copy, rollout_is_completed
-            
+
         except Exception as e:
             # Handle errors by adding error message and returning
             error_msg = {"role": "assistant", "content": f"Error in API call: {str(e)}"}
             messages_copy.append(error_msg)
             return messages_copy, True
-    
-    def eval_api(self, 
-                client: Any,
-                model: str,
-                max_concurrent: int = 32,
-                timeout: int = 60,
-                sampling_args: Dict[str, Any] = {},
-                **kwargs: Any):
+
+    def eval_api(self,
+                 client: Any,
+                 model: str,
+                 max_concurrent: int = 32,
+                 timeout: int = 60,
+                 sampling_args: Dict[str, Any] = {},
+                 **kwargs: Any):
         """
         Evaluate model using OpenAI API with proper concurrency.
         
@@ -216,6 +218,7 @@ class MultiStepEnv(Environment):
         Returns:
             Tuple of (eval_dataset, rewards)
         """
+
         def run_evaluation():
             # Import libraries here to avoid requiring them for normal operation
             import asyncio
@@ -223,19 +226,19 @@ class MultiStepEnv(Environment):
             # Get the evaluation dataset
             if self.eval_dataset is None:
                 self.eval_dataset = self.get_eval_dataset(**kwargs)
-                
+
             if self.eval_dataset is None:
                 raise ValueError("Failed to load evaluation dataset")
-            
+
             eval_dataset = self.eval_dataset
-            
+
             async def process_example(example, semaphore):
                 async with semaphore:
                     # Initialize conversation with system prompt and few-shot examples
                     prompt = example["prompt"]
                     messages = example["prompt"].copy()
                     answer = example["answer"]
-                    
+
                     # Save the length of initial messages to extract just the interaction part later
                     initial_length = len(messages)
 
@@ -253,33 +256,33 @@ class MultiStepEnv(Environment):
                                     **sampling_args
                                 )
                             )
-                            
+
                             # Unpack the step_api result
                             messages, is_completed = step_result
-                            
+
                             # If the rollout is completed, break the loop
                             if is_completed:
                                 break
-                            
+
                         except Exception as e:
                             print(f"Error processing example {example.get('id', 'unknown')}: {str(e)}")
                             break
-                    
+
                     # Extract only the interaction part (not system/few-shot)
                     completions = messages[initial_length:]
-                    
+
                     return {
                         "prompt": prompt,
                         "completions": completions,
                         "answer": answer
                     }
-            
+
             async def run_all_examples():
                 # Create semaphore for concurrency control
                 from tqdm.asyncio import tqdm_asyncio
 
                 semaphore = Semaphore(max_concurrent)
-                
+
                 # Process all examples concurrently
                 tasks = [process_example(example, semaphore) for example in eval_dataset]
                 results = await tqdm_asyncio.gather(
@@ -287,9 +290,9 @@ class MultiStepEnv(Environment):
                     total=len(eval_dataset),
                     desc=f"Evaluating {len(eval_dataset)} examples"
                 )
-                
+
                 return results
-            
+
             # Run the async evaluation
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -297,27 +300,24 @@ class MultiStepEnv(Environment):
                 results = loop.run_until_complete(run_all_examples())
             finally:
                 loop.close()
-            
+
             # Calculate rewards
             results_prompt = [result["prompt"] for result in results]
             results_answer = [result["answer"] for result in results]
             results_completions = [result["completions"] for result in results]
             results = {"prompt": results_prompt, "answer": results_answer, "completions": results_completions}
-            
+
             reward_funcs = self.get_rubric()
             rewards = {}
-            
+
             for reward_func in reward_funcs:
-                func_rewards = reward_func(**results) # type: ignore
+                func_rewards = reward_func(**results)  # type: ignore
                 func_reward_avg = sum(func_rewards) / len(func_rewards)
-                func_name = reward_func.__name__ # type: ignore
+                func_name = reward_func.__name__  # type: ignore
                 print(f"{func_name}: {func_reward_avg}")
                 rewards[func_name] = func_reward_avg
-            
+
             return rewards
-            
+
         # Run the evaluation function
         return run_evaluation()
-    
-
-    

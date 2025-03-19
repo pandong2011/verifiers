@@ -6,7 +6,7 @@ model, tokenizer = vf.get_model_and_tokenizer(model_name)
 
 vf_env = vf.CodeEnv(dataset="gsm8k", few_shot=[], system_prompt=CODE_PROMPT)
 dataset = vf_env.get_dataset()
-#eval_dataset = vf_env.get_eval_dataset(n=20)
+# eval_dataset = vf_env.get_eval_dataset(n=20)
 rubric = vf_env.get_rubric()
 
 # notable defaults: lr = 1e-6, max_grad_norm = 0.01, constant lr 10 warmup steps, 1024 tokens in+out
@@ -27,7 +27,8 @@ training_args.beta = 0.01
 # training_args.per_device_eval_batch_size = 8
 # training_args.eval_steps = 100
 # lora
-from peft import LoraConfig # type: ignore
+from peft import LoraConfig  # type: ignore
+
 peft_config = LoraConfig(
     r=16,
     lora_alpha=64,
@@ -38,11 +39,11 @@ peft_config = LoraConfig(
 trainer = vf.GRPOEnvTrainer(
     model=model,
     processing_class=tokenizer,
-    reward_funcs=rubric, 
+    reward_funcs=rubric,
     env=vf_env,
     args=training_args,
     train_dataset=dataset,
-    #eval_dataset=eval_dataset,
+    # eval_dataset=eval_dataset,
     peft_config=peft_config
 )
 trainer.train()

@@ -25,24 +25,28 @@ XML_COT_FORMAT = """\
 </answer>
 """
 
+
 def extract_xml_reasoning(text: str) -> str:
     reason = text.split("<reasoning>")[-1]
     reason = reason.split("</reasoning>")[0]
     return reason.strip()
+
 
 def extract_xml_answer(text: str) -> str:
     answer = text.split("<answer>")[-1]
     answer = answer.split("</answer>")[0]
     return answer.strip()
 
+
 def extract_hash_answer(text: str) -> str | None:
     if "####" not in text:
         return None
     return text.split("####")[1].strip().replace(",", "").replace("$", "")
 
-def get_gsm8k_questions(split = "train") -> Dataset:
-    data = load_dataset('openai/gsm8k', 'main')[split] # type: ignore
-    data = data.map(lambda x: { # type: ignore
+
+def get_gsm8k_questions(split="train") -> Dataset:
+    data = load_dataset('openai/gsm8k', 'main')[split]  # type: ignore
+    data = data.map(lambda x: {  # type: ignore
         'prompt': [
             {'role': 'system', 'content': SYSTEM_PROMPT},
             {'role': 'user', 'content': 'What is the largest single-digit prime number?'},
@@ -53,8 +57,9 @@ def get_gsm8k_questions(split = "train") -> Dataset:
             {'role': 'user', 'content': x['question']}
         ],
         'answer': extract_hash_answer(x['answer'])
-    }) # type: ignore
-    return data # type: ignore
+    })  # type: ignore
+    return data  # type: ignore
+
 
 dataset = get_gsm8k_questions()
 

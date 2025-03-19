@@ -42,7 +42,7 @@ CODE_FEW_SHOT = [
             )
         },
         {
-            'role': 'user', 
+            'role': 'user',
             'content': output_parser.format(output='2550')
         },
         {
@@ -195,7 +195,8 @@ COMMONSENSE_FEW_SHOT = [
 
 SEARCH_FEW_SHOT = [
     [
-        {'role': 'user', 'content': 'Question: Which of the following is an example of mechanical weathering?\n\nChoices:\nA. A rock turns red when iron minerals are exposed to oxygen.\nB. A rock breaks apart after water freezes and expands in a crack.\nC. A rock dissolves as acidic rainwater flows over its surface.\nD. A rock changes composition when exposed to extreme heat.'},
+        {'role': 'user',
+         'content': 'Question: Which of the following is an example of mechanical weathering?\n\nChoices:\nA. A rock turns red when iron minerals are exposed to oxygen.\nB. A rock breaks apart after water freezes and expands in a crack.\nC. A rock dissolves as acidic rainwater flows over its surface.\nD. A rock changes composition when exposed to extreme heat.'},
         {'role': 'assistant', 'content': tool_parser.format(
             reasoning="I need to understand what mechanical weathering is and which of these options matches that phenomenon. Let me search for information about mechanical weathering.",
             tool='{"name": "search", "args": {"query": "what is mechanical weathering examples", "num_results": 3}}'
