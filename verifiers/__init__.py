@@ -1,3 +1,4 @@
+# 将信息导入到包的命名空间中
 from .envs.environment import Environment
 from .envs.code_env import CodeEnv
 from .envs.doublecheck_env import DoubleCheckEnv
@@ -13,8 +14,10 @@ from .utils.logging_utils import setup_logging, print_prompt_completions_sample
 __version__ = "0.1.0"
 
 # Setup default logging configuration
+# 在整个包中都可以使用相同的日志配置，方便调试和监控
 setup_logging()
 
+# 注册导入信息
 __all__ = [
     "Environment",
     "CodeEnv",
