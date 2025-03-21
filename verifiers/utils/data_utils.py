@@ -62,6 +62,7 @@ def preprocess_dataset(dataset_name: str = "gsm8k",
         })
         return dataset
     elif dataset_name == "math":
+        # 访问训练集 or 验证集 or 测试集
         dataset: Dataset = load_dataset("chiayewken/competition_math")[split]  # type: ignore
         dataset = dataset.map(lambda x: {
             "prompt": format_prompt(x["problem"], system_prompt, few_shot, fewshot_prob),

@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Sequence, Union
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Sequence
 
 from datasets import Dataset
 from trl.trainer.grpo_trainer import RewardFunc
+
 from ..imports import LLM, SamplingParams  # type: ignore
 
 
