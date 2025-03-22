@@ -1,14 +1,14 @@
-from abc import abstractmethod
-from concurrent.futures import ThreadPoolExecutor
 import random
 import time
-from typing import List, Dict, Sequence, Any, Union, Tuple
+from abc import abstractmethod
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Sequence, Any, Tuple
 
 from datasets import Dataset
 from trl.trainer.grpo_trainer import RewardFunc
-from ..imports import LLM, SamplingParams  # type: ignore
 
 from verifiers.envs.environment import Environment
+from ..imports import LLM, SamplingParams  # type: ignore
 
 
 class MultiStepEnv(Environment):
@@ -30,9 +30,13 @@ class MultiStepEnv(Environment):
             "n": 1
         }
         self.sampling_args.update(sampling_args)
+        # mask_env_response: 是否屏蔽环境响应（CoT 中可能隐藏中间反馈）
+        # （0 表示屏蔽，1 表示保留）
         self.env_mask = 0 if mask_env_response else 1
         self.max_workers = max_workers
+        # 每次请求间的休眠时间，避免过载
         self.sleep_time = sleep_time
+        # max_steps: 最大推理步骤，防止无限循环
         self.max_steps = max_steps
 
     def get_dataset(self, **kwargs: Any) -> Dataset | None:
@@ -41,14 +45,17 @@ class MultiStepEnv(Environment):
     def get_eval_dataset(self, **kwargs: Any) -> Dataset | None:
         pass
 
+    # 返回奖励函数列表，用于评估生成结果（CoT 的每一步可能需要评分）
     @abstractmethod
     def get_rubric(self, **kwargs: Any) -> List[RewardFunc]:
         pass
 
+    # 判断当前对话是否完成（例如，问题已解决）
     @abstractmethod
     def is_completed(self, messages: List[Dict[str, str]], **kwargs: Any) -> bool:
         pass
 
+    # 环境对模型输出的响应（如提供提示或验证答案）
     @abstractmethod
     def env_response(self, messages: List[Dict[str, str]], **kwargs: Any) -> Dict[str, str]:
         pass
@@ -58,8 +65,15 @@ class MultiStepEnv(Environment):
              llm: LLM,
              sampling_params: SamplingParams) -> List[Dict[str, Any]]:
 
+        # 筛选未完成状态: 找出未完成（completed=False）的对话
         live_indices = [i for i, s in enumerate(states) if not s["completed"]]
+        # 获取未完成状态的对话历史
         messages_to_step = [states[i]["messages"] for i in live_indices]
+        # 使用 llm.chat 生成下一步推理
+        # llm_response 的结构是一个包含输入和输出信息的对象
+        # prompt_token_ids：表示输入的 token
+        # outputs[0].text：生成的新文本
+        # outputs[0].token_ids：生成文本的 token ID
         llm_responses = llm.chat(messages_to_step, sampling_params=sampling_params, use_tqdm=False)  # type: ignore
 
         # for i, j in enumerate(live_indices):
@@ -67,33 +81,57 @@ class MultiStepEnv(Environment):
             # sleep for 0-1 seconds to avoid rate limiting
             time.sleep(self.sleep_time * random.random())
 
+            # 创建 states[j] 的副本，避免修改原始数据
             state = states[j].copy()
             if len(state["prompt_ids"]) == 0:
+                # 如果 prompt_ids 为空，则用当前prompt的 token ID 初始化
                 state["prompt_ids"] = llm_response.prompt_token_ids
+            # 操作: 将模型生成的响应添加到对话历史（包含prompt,环境响应,模型生成）
+            # state["messages"]初始为：prompt(dict)，当前操作又追加模型生成，所以此时既包含prompt又包含模型生成
+            # prompts: List[List[Dict[str, Any]]] 的设计：
+            # 外层 List：支持批量处理多个任务
+            # 内层 (states；dict chain)List[Dict[str, Any]]：表示每个任务的对话历史，支持 CoT 的多步推理
+            # 即每个state为一个dict
             state["messages"].append({"role": "assistant", "content": llm_response.outputs[0].text})
 
-            # get token lengths of env response and new completion
-            total_prev_len = len(state["prompt_ids"]) + len(state["completion_ids"])
+            # 输入 + 输出
+            # total_prev_len = len(state["prompt_ids"]) + len(state["completion_ids"])
+            # 输入
+            total_prev_len = len(state["prompt_ids"])
+            # 环境响应部分的 token 数
             env_response_len = len(list(llm_response.prompt_token_ids)) - total_prev_len  # type: ignore
+            # 新生成内容的 token 数
             new_completion_len = len(llm_response.outputs[0].token_ids)
 
-            # update completion masks
+            # completion_mask 用于标记 completion_ids 中哪些 token 是环境响应（通常标记为 0），哪些是模型生成的内容（通常标记为 1）
+            # （0 表示屏蔽，1 表示保留）
+            # 标记环境响应
             state["completion_mask"].extend([self.env_mask] * env_response_len)
+            # 标记新生成内容
             state["completion_mask"].extend([1] * new_completion_len)
 
-            # update completion ids
+            # prompt_token_ids = prompt + 环境响应（如果有）
+            # 合并 prompt_token_ids 和模型生成 token
             state["completion_ids"] = list(llm_response.prompt_token_ids)  # type: ignore
             state["completion_ids"].extend(list(llm_response.outputs[0].token_ids))
+            # 去掉prompt部分
+            # 剩余：环境响应（如果有）+ 模型生成 token
             state["completion_ids"] = state["completion_ids"][len(state["prompt_ids"]):]
+            # 同步截断 completion_mask；从后往前截取长度len(state["completion_ids"])
+            # list[-n:] 表示取列表的最后 n 个元素
+            state["completion_mask"] = state["completion_mask"][-(len(state["completion_ids"])):]
 
+            # 对话完成(问题已解决)或截断
             if self.is_completed(state["messages"]) or len(
                     state["completion_ids"]) > sampling_params.max_tokens:  # type: ignore
                 state["completed"] = True
                 state["completion_ids"] = state["completion_ids"][:sampling_params.max_tokens]
                 state["completion_mask"] = state["completion_mask"][:len(state["completion_ids"])]
             else:
+                # 追加到对话历史中
                 state["messages"].append(self.env_response(state["messages"]))
 
+            # check 异常
             if not len(state["completion_mask"]) == len(state["completion_ids"]):
                 print(state["messages"])
                 print(state["completion_mask"])
@@ -103,11 +141,20 @@ class MultiStepEnv(Environment):
             return j, state
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # executor.map: 线程池的 map 方法，类似于 Python 的内置 map 函数，但会并行执行
+            # *args 表示将元组或列表解包，例如 (j, llm_response) 变成 j 和 llm_response
+            # 多线程并行执行未完成状态的状态更新
+            # update_state(j, llm_response)
             results = list(executor.map(
                 lambda args: update_state(*args),
+                # 生成任务参数列表，作为 executor.map 的第二个参数
+                # i 是 live_indices 中的位置（从 0 开始）
+                # j 是未完成状态在 states 中的原始索引
+                # llm_responses[i]: 对应状态的语言模型响应
                 [(j, llm_responses[i]) for i, j in enumerate(live_indices)]
             ))
 
+        # 将结果写回 states
         for j, state in results:
             states[j] = state
 
@@ -123,8 +170,12 @@ class MultiStepEnv(Environment):
 
         # initialize state variables
         all_completed = False
+
         states = [{
+            # messages（对话历史）
+            # 初始为输入prompt
             "messages": m,
+            # 输入prompt的长度
             "prompt_messages": len(m),
             "prompt_ids": [],
             "completed": False,
@@ -133,10 +184,13 @@ class MultiStepEnv(Environment):
         } for m in prompts]
 
         # main loop
+        # 效果与递归调用LLM.chat()一样
         while not all_completed:
             states = self.step(states, llm, custom_sp)
             all_completed = all(state["completed"] for state in states)
 
+        # completion_messages：环境响应（如果有）+ 模型生成 token
+        # 使output中的三部分内容保持一致
         completion_messages = [s["messages"][s["prompt_messages"]:] for s in states]
         completion_ids = [s["completion_ids"] for s in states]
         completion_mask = [s["completion_mask"] for s in states]
@@ -182,6 +236,7 @@ class MultiStepEnv(Environment):
 
             # Check if we're done
             if self.is_completed(messages_copy):
+                # rollout: step
                 rollout_is_completed = True
             else:
                 rollout_is_completed = False
