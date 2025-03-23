@@ -25,7 +25,6 @@ def get_model(model_name: str, model_kwargs: Union[Dict[str, Any], None] = None)
 
 
 def get_tokenizer(model_name: str) -> Any:
-    tokenizer = None
     if "Instruct" in model_name:
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     else:
