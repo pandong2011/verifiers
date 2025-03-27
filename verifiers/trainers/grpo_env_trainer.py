@@ -168,7 +168,9 @@ class GRPOEnvTrainer(GRPOTrainer):
             # 如果 self.beta == 0.0（无 KL 正则化），ref_per_token_logps 设为 None
             if self.beta == 0.0:
                 ref_per_token_logps = None
+            # KL散度类似蒸馏
             # 如果存在参考模型（self.ref_model），用 self.ref_model 计算对数概率
+            # 参考模型为教师模型
             elif self.ref_model is not None:
                 ref_per_token_logps = self._get_per_token_logps(
                     self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
