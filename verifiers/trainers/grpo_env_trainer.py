@@ -157,6 +157,7 @@ class GRPOEnvTrainer(GRPOTrainer):
         with torch.no_grad():
             # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's
             # computation here, and use per_token_logps.detach() instead.
+            # logps: log probabilities
             if self.num_iterations > 1:
                 old_per_token_logps = self._get_per_token_logps(
                     self.model, prompt_completion_ids, attention_mask, logits_to_keep
@@ -164,12 +165,15 @@ class GRPOEnvTrainer(GRPOTrainer):
             else:
                 old_per_token_logps = None
 
+            # 如果 self.beta == 0.0（无 KL 正则化），ref_per_token_logps 设为 None
             if self.beta == 0.0:
                 ref_per_token_logps = None
+            # 如果存在参考模型（self.ref_model），用 self.ref_model 计算对数概率
             elif self.ref_model is not None:
                 ref_per_token_logps = self._get_per_token_logps(
                     self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
                 )
+            # 否则，使用当前模型（self.model）但禁用适配器（disable_adapter），模拟参考模型行为，计算对数概率
             else:
                 with self.accelerator.unwrap_model(self.model).disable_adapter():
                     ref_per_token_logps = self._get_per_token_logps(
@@ -181,22 +185,29 @@ class GRPOEnvTrainer(GRPOTrainer):
         rewards_per_func = torch.zeros(len(prompts), len(self.reward_funcs), device=device)
         for i, reward_func in enumerate(self.reward_funcs):
             # Repeat all input columns (but "prompt" and "completion") to match the number of generations
+            # 从 inputs 中提取除 prompt 和 completion 外的其他键（如元数据）
             keys = [key for key in inputs[0] if key not in ["prompt", "completion"]]  # type: ignore
             reward_kwargs = {key: [example[key] for example in inputs] for key in keys}  # type: ignore
             output_reward_func = reward_func(prompts=prompts, completions=completions, **reward_kwargs)  # type: ignore
+            # 将奖励值转换为张量，存储在 rewards_per_func 的第 i 列
             rewards_per_func[:, i] = torch.tensor(output_reward_func, dtype=torch.float32, device=device)
 
         rewards_per_func = gather(rewards_per_func)
 
         # Apply weights to each reward function's output and sum
+        # 多个奖励加权求和；得到每个prompt的总奖励
         rewards = (rewards_per_func * self.reward_weights.to(device).unsqueeze(0)).sum(dim=1)
 
         # Compute grouped-wise rewards
         # one_group: num_generations
+        # reshape 后按组计算mean and std
         mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)  # type: ignore
         std_grouped_rewards = rewards.view(-1, self.num_generations).std(dim=1)  # type: ignore
 
         # Normalize the rewards to compute the advantages
+        # 将组内均值和标准差重复 self.num_generations 次(reshape时相当于除以num_generations)，扩展到与 rewards 长度一致，便于后续优势计算
+        # 确保每组补全使用相同的均值和标准差进行归一化
+        # interleave: 交织
         mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0)  # type: ignore
         std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)  # type: ignore
         advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4)
@@ -206,15 +217,22 @@ class GRPOEnvTrainer(GRPOTrainer):
             self.accelerator.process_index * len(prompts),
             (self.accelerator.process_index + 1) * len(prompts),
         )
+        # 按索引给gpu分发优势数据
         advantages = advantages[process_slice]
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
 
+        # completion_mask.sum(1)
+        # 沿序列维度（dim=1）求和，计算每个补全的实际 token 数量（1 的数量）
+        # gather_for_metrics：收集所有进程的数据
+        # completion_length：补全的平均长度
         completion_length = self.accelerator.gather_for_metrics(
             completion_mask.sum(1)).float().mean().item()  # type: ignore
         self._metrics[mode]["completion_length"].append(completion_length)
 
+        # 对 rewards_per_func 沿第 0 维（样本维度）求均值，得到每个奖励函数的平均奖励
+        # rewards_per_func shape：(num_samples, num_reward_funcs)
         reward_per_func = rewards_per_func.mean(0)  # type: ignore
         for i, reward_func in enumerate(self.reward_funcs):
             reward_func_name = reward_func.__name__  # type: ignore
@@ -223,6 +241,8 @@ class GRPOEnvTrainer(GRPOTrainer):
         self._metrics[mode]["reward"].append(rewards.mean().item())
         self._metrics[mode]["reward_std"].append(std_grouped_rewards.mean().item())
 
+        # log: 日志
+        # log_completions: 打印补全
         if self.log_completions and self.state.global_step % self.args.logging_steps == 0:
             prompts_to_log = gather_object(prompts)
             completions_to_log = gather_object(completions)
@@ -230,6 +250,9 @@ class GRPOEnvTrainer(GRPOTrainer):
 
             if self.accelerator.is_main_process:
                 if is_rich_available():
+                    # 如果 rich 库可用，打印第一个 prompt、补全和奖励的样本，附带当前步数
+                    # prompts_to_log[0][-1]["content"] 是“第一个 prompt 的最后一个消息内容”，通常是用户的最新输入
+                    # 模型的回复在 completions_to_log 中
                     print_prompt_completions_sample(
                         [str(prompts_to_log[0][-1]["content"])],
                         [completions_to_log[0]],
@@ -249,6 +272,11 @@ class GRPOEnvTrainer(GRPOTrainer):
                     df = pd.DataFrame(table)
                     wandb.log({"completions": wandb.Table(dataframe=df)})  # type: ignore
 
+        # num_iterations > 1 时计算
+        # old_per_token_logps：反映旧策略的对数概率，用于策略比率计算
+        # beta != 0 时计算
+        # ref_per_token_logps：反映参考策略的对数概率，用于 KL 正则化
+        # 两者共同确保 GRPO 训练稳定：old 控制更新幅度，ref 防止偏离初始分布
         return {
             "prompt_ids": prompt_ids,
             "prompt_mask": prompt_mask,
