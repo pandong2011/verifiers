@@ -22,6 +22,8 @@ def get_default_grpo_config(run_name: str,
         max_prompt_length=1024,
         max_completion_length=1024,
         per_device_train_batch_size=2,
+        # num_generations 表示每个输入提示要生成多少个输出
+        # 如果 global_batch_size 不能被 num_generations 整除，可能会导致数据分配不均或进程间同步问题
         num_generations=(2 * num_gpus - 2 if num_gpus > 1 else 2),
         gradient_accumulation_steps=int(16 / num_gpus),
         # 前向传播不使用缓存
