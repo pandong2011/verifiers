@@ -63,9 +63,6 @@ class GRPOEnvTrainer(GRPOTrainer):
         )
         self.env = env
 
-    # _generate_and_score_completions 函数实现了 GRPO 的生成和奖励计算部分， “Policy Model → Reward Model → Group Computation”。
-    # compute_loss 函数实现了 GRPO 的损失计算部分，对应图中的 KL 正则化和策略更新。
-
     def _generate_and_score_completions(
             self, inputs: dict[str, Union[torch.Tensor, Any]]
     ) -> dict[str, Union[torch.Tensor, Any]]:
